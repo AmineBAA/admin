@@ -12,10 +12,6 @@ if "connected" not in st.session_state:
     st.session_state.connected = False
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
-if "user_prenom" not in st.session_state:
-    st.session_state.user_prenom = None
-if "user_points" not in st.session_state:
-    st.session_state.user_points = 0
 if "role" not in st.session_state:
     st.session_state.role = None
 if "auth_mode" not in st.session_state:
@@ -32,38 +28,20 @@ def get_image_base64(path):
             return base64.b64encode(image_file.read()).decode()
     return ""
 
+# Encodage du logo Saham
 LOGO_PATH = "logo-Saham Bank.jfif"
 logo_base64 = get_image_base64(LOGO_PATH)
-
-# --- FONCTION DE MATCHING AVEC LE FICHIER CSV ---
-# --- FONCTION DE MATCHING AVEC LE FICHIER CSV (CORRIGÉE AVEC LE SÉPARATEUR ';') ---
-def recuperer_points_utilisateur(email):
-    csv_path = "data_test.csv"
-    if os.path.exists(csv_path):
-        try:
-            # Correction ici : on ajoute sep=";" pour lire correctement le fichier
-            df_points = pd.read_csv(csv_path, sep=";")
-            
-            # Nettoyage des espaces autour des noms de colonnes
-            df_points.columns = df_points.columns.str.strip()
-            
-            # Recherche de l'email (en minuscules et sans espaces)
-            row = df_points[df_points['email'].str.strip().str.lower() == email.strip().lower()]
-            
-            if not row.empty:
-                # Retourne la valeur de la colonne 'points'
-                return int(row.iloc[0]['points'])
-        except Exception as e:
-            print(f"Erreur lors de la lecture du CSV : {e}")
-    return 0  # Retourne 0 points par défaut si non trouvé
 
 # --- STYLE CSS INJECTÉ ---
 st.markdown("""
 <style>
+    /* Global Background Color */
     .stApp {
         background-color: #162E28;
         color: #FFFFFF;
     }
+    
+    /* Input field styling */
     .stTextInput div div input {
         background-color: #1C3A32 !important;
         color: #FFFFFF !important;
@@ -71,6 +49,8 @@ st.markdown("""
         border-radius: 8px !important;
         height: 45px;
     }
+    
+    /* Primary Buttons (Orange Saham) */
     .stButton>button[kind="primary"] {
         background-color: #E6673D !important;
         border-color: #E6673D !important;
@@ -81,6 +61,8 @@ st.markdown("""
         font-size: 16px;
         width: 100%;
     }
+    
+    /* Logo Container Style */
     .logo-container {
         display: flex;
         align-items: center;
@@ -88,7 +70,7 @@ st.markdown("""
         margin-bottom: 20px;
     }
     .logo-img {
-        height: 35px;
+        height: 35px; /* Ajuste la hauteur selon tes préférences */
         object-fit: contain;
     }
     .logo-text {
@@ -98,6 +80,8 @@ st.markdown("""
         font-size: 16px;
         margin: 0;
     }
+    
+    /* Card Styles for Welcome Page */
     .main-card {
         background: linear-gradient(135deg, #162E28 0%, #1C3A32 100%);
         border-radius: 20px;
@@ -129,6 +113,8 @@ def init_db():
     conn = sqlite3.connect("utilisateurs.db")
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, prenom TEXT, nom TEXT)")
+    
+    # Bloc de sécurité pour ajouter les colonnes si elles manquent
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN prenom TEXT")
     except sqlite3.OperationalError:
@@ -137,6 +123,7 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN nom TEXT")
     except sqlite3.OperationalError:
         pass
+        
     conn.commit()
     conn.close()
 
@@ -183,19 +170,17 @@ if st.session_state.connected:
             st.rerun()
 
     else:
-        # Style clair pour l'espace membre (Mockup Page 3)
+        # Style clair pour l'espace membre
         st.markdown("<style>.stApp { background-color: #F8F9FA !important; color: #333333 !important; }</style>", unsafe_allow_html=True)
         
-        # En-tête avec le prénom dynamique
         st.markdown(f"""
-            <h1 style='color: #162E28; font-family: serif; margin-bottom:0;'>Bonjour {st.session_state.user_prenom}</h1>
+            <h1 style='color: #162E28; font-family: serif; margin-bottom:0;'>Bonjour {st.session_state.current_user}</h1>
             <p style='color: #666666; margin-top:0; margin-bottom:30px;'>Ravi de vous revoir</p>
         """, unsafe_allow_html=True)
         
         col_center, _ = st.columns([2, 1])
         with col_center:
-            # Grande Carte Verte avec les POINTS DYNAMIQUES tirés du CSV
-            st.markdown(f"""
+            st.markdown("""
                 <div class="main-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; opacity: 0.8; font-size: 13px; font-weight: bold; letter-spacing: 1px;">
                         <span>SAHAM LOYALTY PROGRAM</span>
@@ -204,10 +189,10 @@ if st.session_state.connected:
                     <div style="margin-top: 30px;">
                         <span style="font-size: 12px; opacity: 0.7; font-weight: bold;">POINTS DISPONIBLES</span>
                         <div style="font-size: 64px; font-weight: bold; font-family: serif; line-height: 1;">
-                            {st.session_state.user_points:,} <span style="font-size: 24px; color: #E6673D; font-family: sans-serif;">pts</span>
+                            125 <span style="font-size: 24px; color: #E6673D; font-family: sans-serif;">pts</span>
                         </div>
                     </div>
-                    <div style="margin-top: 35px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <div style="margin-top: 35px; border-top: 1px solid rgba(25px,255,255,0.1); padding-top: 15px;">
                         <span style="font-size: 11px; opacity: 0.6; font-weight: bold;">VALABLE JUSQU'AU</span><br>
                         <span style="font-size: 15px; font-weight: bold;">31/12/2027</span>
                     </div>
@@ -241,6 +226,8 @@ else:
     
     with col_visuel:
         st.write("")
+        
+        # Insertion dynamique du logo à la place du emoji oiseau
         if logo_base64:
             st.markdown(f"""
                 <div class="logo-container">
@@ -249,6 +236,7 @@ else:
                 </div>
             """, unsafe_allow_html=True)
         else:
+            # Fallback textuel au cas où le fichier n'est pas trouvé
             st.markdown("<p style='font-weight: bold; letter-spacing: 1px; opacity: 0.8;'>SAHAM BANK</p>", unsafe_allow_html=True)
             
         st.write("")
@@ -299,12 +287,7 @@ else:
                 elif res and res[0] == "user":
                     st.session_state.connected = True
                     st.session_state.role = "user"
-                    st.session_state.current_user = login_email
-                    st.session_state.user_prenom = res[1]
-                    
-                    # --- CRUCIAL : MATCHING ET REQUISITION DES POINTS DYNAMIQUES ---
-                    st.session_state.user_points = recuperer_points_utilisateur(login_email)
-                    
+                    st.session_state.current_user = res[1]
                     st.rerun()
                 else:
                     st.error("Identifiants incorrects.")
