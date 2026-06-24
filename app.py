@@ -1,19 +1,61 @@
 import streamlit as st
+import sqlite3
+import pandas as pd
 
 # --- CONFIGURATION DE LA PAGE ---
-st.set_page_config(page_title="Test Authentification", page_icon="🔒", layout="centered")
+st.set_page_config(page_title="Test Authentification + DB", page_icon="🔐", layout="centered")
+
+# --- INITIALISATION DE LA BASE DE DONNÉES LOCALES (SQLite) ---
+def init_db():
+    conn = sqlite3.connect("utilisateurs.db")
+    cursor = conn.cursor()
+    # Création de la table si elle n'existe pas encore
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# --- FONCTIONS DE GESTION DES UTILISATEURS ---
+def ajouter_utilisateur(email, password):
+    try:
+        conn = sqlite3.connect("utilisateurs.db")
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, password))
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        # Gère le cas où l'email existe déjà (contrainte UNIQUE)
+        return False
+
+def verifier_utilisateur(email, password):
+    conn = sqlite3.connect("utilisateurs.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE email = ? AND password = ?", (email, password))
+    user = cursor.fetchone()
+    conn.close()
+    return user is not None
+
+def recuperer_tous_les_inscrits():
+    conn = sqlite3.connect("utilisateurs.db")
+    # Pandas permet de lire directement une requête SQL et d'en faire un DataFrame
+    df = pd.read_sql_query("SELECT id, email FROM users", conn)
+    conn.close()
+    return df
 
 # --- INITIALISATION DES VARIABLES DE SESSION ---
-# Permet de garder en mémoire si l'utilisateur est connecté et de stocker les "comptes" créés
 if "connected" not in st.session_state:
     st.session_state.connected = False
-if "users_db" not in st.session_state:
-    # Un petit dictionnaire pour simuler une base de données (Format: {"email": "mot_de_passe"})
-    st.session_state.users_db = {}
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
-# --- FONCTIONS LOGIQUE ---
 def logout():
     st.session_state.connected = False
     st.session_state.current_user = None
@@ -21,25 +63,44 @@ def logout():
 
 # --- ESPACE MEMBRE (PAGE VIDE) ---
 if st.session_state.connected:
-    # Barre latérale pour se déconnecter
+    # Barre latérale
     with st.sidebar:
         st.write(f"👤 Connecté en tant que : **{st.session_state.current_user}**")
-        if st.button("Se déconnecter", use_container_width=True):
+        
+        st.divider()
+        st.subheader("📊 Administration (Test)")
+        
+        # Récupération de la liste des inscrits via la DB
+        df_inscrits = recuperer_tous_les_inscrits()
+        
+        # Bouton pour télécharger la liste en CSV
+        csv = df_inscrits.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Télécharger la liste des inscrits",
+            data=csv,
+            file_name="liste_inscrits.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+        st.divider()
+        if st.button("Se déconnecter", use_container_width=True, type="secondary"):
             logout()
     
-    # Contenu de la plateforme vide
+    # Contenu de l'application
     st.title("Mon Application Sécurisée")
     st.subheader("Bienvenue sur votre espace !")
     
-    st.info("Cette page est actuellement vide. Le concept d'authentification fonctionne ! 🚀")
+    st.info("Cette page est vide. Les utilisateurs sont maintenant persistés dans la base de données locale `utilisateurs.db`.")
     
-    # Tu peux ajouter ton futur contenu ici...
+    # Optionnel : Afficher la liste directement à l'écran pour ton test
+    with st.expander("👀 Voir la liste des inscrits en base (visible pour le test)"):
+        st.dataframe(df_inscrits, use_container_width=True)
 
 # --- PAGE D'AUTHENTIFICATION (CONNEXION / INSCRIPTION) ---
 else:
     st.title("🔐 Accès à la Plateforme")
     
-    # Création de deux onglets : Connexion et Inscription
     tab_login, tab_register = st.tabs(["Se connecter", "S'inscrire"])
     
     # --- ONGLET : CONNEXION ---
@@ -49,11 +110,11 @@ else:
         login_password = st.text_input("Mot de passe", type="password", key="login_password")
         
         if st.button("Connexion", type="primary", use_container_width=True):
-            # Vérification si l'email existe et si le mot de passe correspond
-            if login_email in st.session_state.users_db and st.session_state.users_db[login_email] == login_password:
+            # Vérification dans la base SQLite
+            if verifier_utilisateur(login_email, login_password):
                 st.session_state.connected = True
                 st.session_state.current_user = login_email
-                st.success("Connexion réussie ! Redirection...")
+                st.success("Connexion réussie !")
                 st.rerun()
             else:
                 st.error("Email ou mot de passe incorrect.")
@@ -67,9 +128,10 @@ else:
         if st.button("S'inscrire", use_container_width=True):
             if reg_email == "" or reg_password == "":
                 st.warning("Veuillez remplir tous les champs.")
-            elif reg_email in st.session_state.users_db:
-                st.error("Cet email est déjà enregistré.")
             else:
-                # Ajout de l'utilisateur dans notre "base de données" en mémoire
-                st.session_state.users_db[reg_email] = reg_password
-                st.success("Compte créé avec succès ! Vous pouvez maintenant vous connecter.")
+                # Tentative d'ajout dans la base SQLite
+                succes = ajouter_utilisateur(reg_email, reg_password)
+                if succes:
+                    st.success("Compte créé avec succès en base de données ! Passez à l'onglet Connexion.")
+                else:
+                    st.error("Cet email est déjà enregistré dans la base de données.")
