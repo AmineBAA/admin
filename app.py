@@ -90,10 +90,31 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- BASE DE DONNÉES SQLite ---
+# --- INITIALISATION DE LA BASE DE DONNÉES SQLite (Version Robuste) ---
 def init_db():
     conn = sqlite3.connect("utilisateurs.db")
     cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, prenom TEXT, nom TEXT)")
+    
+    # 1. Création initiale de la table de base si elle n'existe pas
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    """)
+    
+    # 2. Sécurité : Ajouter les colonnes prenom et nom si l'ancien fichier existe déjà
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN prenom TEXT")
+    except sqlite3.OperationalError:
+        pass  # La colonne existe déjà, on ne fait rien
+        
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN nom TEXT")
+    except sqlite3.OperationalError:
+        pass  # La colonne existe déjà, on ne fait rien
+        
     conn.commit()
     conn.close()
 
