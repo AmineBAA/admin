@@ -1,6 +1,8 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+import base64
+import os
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Saham Bank - Néo Points", page_icon="🧡", layout="wide", initial_sidebar_state="collapsed")
@@ -13,16 +15,27 @@ if "current_user" not in st.session_state:
 if "role" not in st.session_state:
     st.session_state.role = None
 if "auth_mode" not in st.session_state:
-    st.session_state.auth_mode = "login"  # 'login' ou 'register'
+    st.session_state.auth_mode = "login"
 
 # --- CONFIGURATION ADMIN ---
 ADMIN_EMAIL = "admin@test.com"
 ADMIN_PASSWORD = "admin123"
 
-# --- STYLE CSS INJECTÉ (Pour correspondre aux Mockups) ---
+# --- FONCTION POUR ENCODER LE LOGO LOCAL EN BASE64 ---
+def get_image_base64(path):
+    if os.path.exists(path):
+        with open(path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    return ""
+
+# Encodage du logo Saham
+LOGO_PATH = "logo-Saham Bank.jfif"
+logo_base64 = get_image_base64(LOGO_PATH)
+
+# --- STYLE CSS INJECTÉ ---
 st.markdown("""
 <style>
-    /* Global Background Color based on Page 1 & 2 */
+    /* Global Background Color */
     .stApp {
         background-color: #162E28;
         color: #FFFFFF;
@@ -49,20 +62,26 @@ st.markdown("""
         width: 100%;
     }
     
-    /* Secondary Action Links */
-    .link-style {
-        color: #E6673D;
-        text-decoration: none;
-        font-weight: bold;
-        cursor: pointer;
+    /* Logo Container Style */
+    .logo-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .logo-img {
+        height: 35px; /* Ajuste la hauteur selon tes préférences */
+        object-fit: contain;
+    }
+    .logo-text {
+        font-weight: bold; 
+        letter-spacing: 1px; 
+        opacity: 0.9;
+        font-size: 16px;
+        margin: 0;
     }
     
-    /* Card Styles for Welcome Page (Page 3.png) */
-    .welcome-bg {
-        background-color: #F4F6F6 !important;
-        padding: 30px;
-        border-radius: 20px;
-    }
+    /* Card Styles for Welcome Page */
     .main-card {
         background: linear-gradient(135deg, #162E28 0%, #1C3A32 100%);
         border-radius: 20px;
@@ -90,30 +109,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- BASE DE DONNÉES SQLite ---
-# --- INITIALISATION DE LA BASE DE DONNÉES SQLite (Version Robuste) ---
 def init_db():
     conn = sqlite3.connect("utilisateurs.db")
     cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, prenom TEXT, nom TEXT)")
     
-    # 1. Création initiale de la table de base si elle n'existe pas
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    """)
-    
-    # 2. Sécurité : Ajouter les colonnes prenom et nom si l'ancien fichier existe déjà
+    # Bloc de sécurité pour ajouter les colonnes si elles manquent
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN prenom TEXT")
     except sqlite3.OperationalError:
-        pass  # La colonne existe déjà, on ne fait rien
-        
+        pass
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN nom TEXT")
     except sqlite3.OperationalError:
-        pass  # La colonne existe déjà, on ne fait rien
+        pass
         
     conn.commit()
     conn.close()
@@ -147,36 +156,30 @@ def recuperer_tous_les_inscrits():
     conn.close()
     return df
 
-# --- ZONE CONNECTÉE (Page 3.png) ---
+# --- ZONE CONNECTÉE ---
 if st.session_state.connected:
     
-    # --- VUE ADMIN ---
     if st.session_state.role == "admin":
         st.title("🛠️ Administration Centralisée")
         df_inscrits = recuperer_tous_les_inscrits()
         st.dataframe(df_inscrits, use_container_width=True)
         csv = df_inscrits.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Exporter la liste des clients (CSV)", data=csv, file_name="clients_centralises.csv", mime="text/csv")
+        st.download_button("📥 Exporter la liste (CSV)", data=csv, file_name="clients.csv", mime="text/csv")
         if st.button("Se déconnecter"):
             st.session_state.connected = False
             st.rerun()
 
-    # --- VUE CLIENT (Page 3.png) ---
     else:
-        # Forcer un fond clair uniquement sur l'espace client pour matcher le mockup Page 3
+        # Style clair pour l'espace membre
         st.markdown("<style>.stApp { background-color: #F8F9FA !important; color: #333333 !important; }</style>", unsafe_allow_html=True)
         
-        # En-tête Dynamique
         st.markdown(f"""
             <h1 style='color: #162E28; font-family: serif; margin-bottom:0;'>Bonjour {st.session_state.current_user}</h1>
             <p style='color: #666666; margin-top:0; margin-bottom:30px;'>Ravi de vous revoir</p>
         """, unsafe_allow_html=True)
         
-        # Layout principal centré comme sur l'image
         col_center, _ = st.columns([2, 1])
-        
         with col_center:
-            # Grande Carte Verte "SAHAM LOYALTY PROGRAM"
             st.markdown("""
                 <div class="main-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; opacity: 0.8; font-size: 13px; font-weight: bold; letter-spacing: 1px;">
@@ -196,13 +199,11 @@ if st.session_state.connected:
                 </div>
             """, unsafe_allow_html=True)
             
-            # Liste des options cliquables simulées
             options = [
                 ("💳", "Historique paiements"),
                 ("🕒", "Historique points"),
                 ("🎁", "Catalogue cadeaux")
             ]
-            
             for icon, text in options:
                 st.markdown(f"""
                     <div class="sub-card">
@@ -219,15 +220,25 @@ if st.session_state.connected:
             st.session_state.connected = False
             st.rerun()
 
-# --- ZONE AUTHENTIFICATION (Page 1.jpg & Page 2.jpg) ---
+# --- ZONE AUTHENTIFICATION ---
 else:
-    # Division 50/50 pour le visuel à gauche et les formulaires à droite
     col_visuel, col_form = st.columns([1, 1], gap="large")
     
-    # --- COLONNE GAUCHE : MOCKUP STATIQUE VISUEL ---
     with col_visuel:
         st.write("")
-        st.markdown("<p style='font-weight: bold; letter-spacing: 1px; opacity: 0.8;'>🦅 SAHAM BANK</p>", unsafe_allow_html=True)
+        
+        # Insertion dynamique du logo à la place du emoji oiseau
+        if logo_base64:
+            st.markdown(f"""
+                <div class="logo-container">
+                    <img class="logo-img" src="data:image/jfif;base64,{logo_base64}">
+                    <span class="logo-text">SAHAM BANK</span>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Fallback textuel au cas où le fichier n'est pas trouvé
+            st.markdown("<p style='font-weight: bold; letter-spacing: 1px; opacity: 0.8;'>SAHAM BANK</p>", unsafe_allow_html=True)
+            
         st.write("")
         st.write("")
         st.markdown("<p style='color: #E6673D; font-weight: bold; font-size: 14px; letter-spacing: 1px;'>— SAHAM LOYALTY PROGRAM</p>", unsafe_allow_html=True)
@@ -242,7 +253,6 @@ else:
         """, unsafe_allow_html=True)
         
         st.write("")
-        # Petit encadré des points cumulés globaux du mockup
         st.markdown("""
             <div style="background-color: rgba(28, 58, 50, 0.5); border: 1px solid #2D5248; border-radius: 15px; padding: 15px 20px; display: flex; align-items: center; gap: 15px; max-width: 300px;">
                 <span style="background-color: #E6673D; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">★</span>
@@ -253,22 +263,18 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-    # --- COLONNE DROITE : FORMULAIRES INTERACTIFS ---
     with col_form:
         st.markdown("<p style='text-align: right; opacity: 0.5; font-size: 12px;'>Sécurisé 256 bits</p>", unsafe_allow_html=True)
         
-        # --- MODE : CONNEXION (Page 1.jpg) ---
         if st.session_state.auth_mode == "login":
             st.markdown("<h2 style='font-family: serif; font-size: 40px; margin-bottom:0;'>Néo Points</h2>", unsafe_allow_html=True)
             
-            # Switch vers inscription
             if st.button("Nouveau chez Saham Loyalty Program ? Ouvrir un compte", key="go_reg", type="secondary"):
                 st.session_state.auth_mode = "register"
                 st.rerun()
                 
             login_email = st.text_input("E-mail ou identifiant client", placeholder="vous@exemple.com")
             login_password = st.text_input("Mot de passe", type="password", placeholder="••••••••••••")
-            
             st.checkbox("Rester connecté", value=True)
             
             if st.button("Se connecter", type="primary", use_container_width=True):
@@ -281,16 +287,14 @@ else:
                 elif res and res[0] == "user":
                     st.session_state.connected = True
                     st.session_state.role = "user"
-                    st.session_state.current_user = res[1] # On prend le Prénom enregistré
+                    st.session_state.current_user = res[1]
                     st.rerun()
                 else:
                     st.error("Identifiants incorrects.")
 
-        # --- MODE : INSCRIPTION (Page 2.jpg) ---
         else:
             st.markdown("<h2 style='font-family: serif; font-size: 40px; margin-bottom:0;'>Néo Points</h2>", unsafe_allow_html=True)
             
-            # Switch vers connexion
             if st.button("Déjà inscrit au programme ? Se connecter", key="go_log", type="secondary"):
                 st.session_state.auth_mode = "login"
                 st.rerun()
@@ -315,4 +319,4 @@ else:
                     else:
                         st.error("Cet e-mail existe déjà.")
                 else:
-                    st.warning("Veuillez remplir les champs obligatoires (Prénom, Email, Passe).")
+                    st.warning("Veuillez remplir les champs obligatoires.")
