@@ -36,17 +36,18 @@ LOGO_PATH = "logo-Saham Bank.jfif"
 logo_base64 = get_image_base64(LOGO_PATH)
 
 # --- FONCTION DE MATCHING AVEC LE FICHIER CSV ---
+# --- FONCTION DE MATCHING AVEC LE FICHIER CSV (CORRIGÉE AVEC LE SÉPARATEUR ';') ---
 def recuperer_points_utilisateur(email):
     csv_path = "data_test.csv"
     if os.path.exists(csv_path):
         try:
-            # Lecture du fichier CSV
-            df_points = pd.read_csv(csv_path)
+            # Correction ici : on ajoute sep=";" pour lire correctement le fichier
+            df_points = pd.read_csv(csv_path, sep=";")
             
-            # Nettoyage simple des colonnes pour éviter les espaces en trop
+            # Nettoyage des espaces autour des noms de colonnes
             df_points.columns = df_points.columns.str.strip()
             
-            # Recherche de l'email (en minuscules pour éviter les erreurs de casse)
+            # Recherche de l'email (en minuscules et sans espaces)
             row = df_points[df_points['email'].str.strip().str.lower() == email.strip().lower()]
             
             if not row.empty:
@@ -54,7 +55,7 @@ def recuperer_points_utilisateur(email):
                 return int(row.iloc[0]['points'])
         except Exception as e:
             print(f"Erreur lors de la lecture du CSV : {e}")
-    return 0 # Retourne 0 points par défaut si l'email n'est pas trouvé ou s'il y a un problème
+    return 0  # Retourne 0 points par défaut si non trouvé
 
 # --- STYLE CSS INJECTÉ ---
 st.markdown("""
